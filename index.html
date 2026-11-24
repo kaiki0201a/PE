@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thí nghiệm lọc nước</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #e0f7fa 0%, #b3e5fc 50%, #e8f5e9 100%);
+      min-height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0; padding: 0;
+    }
+
+    /* ===== GENERAL ===== */
+    .title-bar {
+      background: linear-gradient(90deg, #0288d1, #26c6da, #43a047);
+      color: white;
+      text-align: center;
+      padding: 12px 20px;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      border-radius: 0 0 16px 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .subtitle { font-size: 13px; font-weight: 400; opacity: 0.9; margin-top: 2px; }
+
+    .main-layout {
+      display: flex;
+      gap: 12px;
+      padding: 10px 14px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ===== COLUMN A ===== */
+    .col-a {
+      width: 200px;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.85);
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+    .col-header {
+      text-align: center;
+      font-weight: 800;
+      font-size: 15px;
+      color: #1565c0;
+      background: linear-gradient(90deg, #bbdefb, #e3f2fd);
+      border-radius: 10px;
+      padding: 6px;
+      margin-bottom: 10px;
+      border: 2px solid #90caf9;
+    }
+    .material-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      border: 2px solid #90caf9;
+      border-radius: 12px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a237e;
+    }
+    .material-item:hover { transform: scale(1.04); background: #e3f2fd; border-color: #1976d2; }
+    .material-item.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+    .material-item.used { opacity: 0.5; border-style: dashed; cursor: default; }
+    .mat-icon { font-size: 22px; }
+
+    /* ===== COLUMN B ===== */
+    .col-b {
+      flex: 1;
+      background: rgba(255,255,255,0.85);
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      position: relative;
+      min-height: 600px;
+    }
+    .col-b-header {
+      text-align: center;
+      font-weight: 800;
+      font-size: 15px;
+      color: #2e7d32;
+      background: linear-gradient(90deg, #c8e6c9, #e8f5e9);
+      border-radius: 10px;
+      padding: 6px;
+      margin-bottom: 10px;
+      border: 2px solid #a5d6a7;
+    }
+
+    /* ===== WORKSPACE ===== */
+    .workspace {
+      position: relative;
+      width: 100%;
+      min-height: 480px;
+      background: radial-gradient(ellipse at center, #f0f8ff 0%, #e1f5fe 100%);
+      border-radius: 12px;
+      border: 2px dashed #90caf9;
+      overflow: hidden;
+    }
+
+    /* ===== INVENTORY ===== */
+    .inventory-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+      min-height: 50px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 10px;
+      padding: 8px;
+      border: 1px solid #b3e5fc;
+    }
+    .inv-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      background: white;
+      border: 2px solid #42a5f5;
+      border-radius: 10px;
+      padding: 6px 10px;
+      cursor: grab;
+      font-size: 12px;
+      font-weight: 700;
+      color: #1565c0;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .inv-item:hover { background: #e3f2fd; transform: scale(1.07); }
+    .inv-item.dragging { opacity: 0.4; cursor: grabbing; }
+    .inv-item .item-icon { font-size: 20px; }
+
+    /* ===== FILTER SYSTEM SVG ===== */
+    #filter-canvas {
+      width: 100%;
+      height: 450px;
+      display: block;
+    }
+
+    /* ===== WATER PARTICLES ===== */
+    .water-particle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: fall linear forwards;
+    }
+    @keyframes fall {
+      0% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(var(--dy)); }
+    }
+    @keyframes drop-fall {
+      0% { opacity: 1; transform: translateY(0) scaleY(1); }
+      80% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(var(--dy)) scaleY(1.5); }
+    }
+
+    /* ===== CONTROLS ===== */
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: none;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .btn:hover { transform: scale(1.05); }
+    .btn-auto { background: linear-gradient(135deg, #43a047, #66bb6a); color: white; box-shadow: 0 3px 10px rgba(67,160,71,0.4); }
+    .btn-pause { background: linear-gradient(135deg, #fb8c00, #ffa726); color: white; box-shadow: 0 3px 10px rgba(251,140,0,0.4); }
+    .btn-reset { background: linear-gradient(135deg, #e53935, #ef5350); color: white; box-shadow: 0 3px 10px rgba(229,57,53,0.4); }
+
+    /* ===== SLIDERS ===== */
+    .sliders-panel {
+      background: rgba(255,255,255,0.7);
+      border-radius: 12px;
+      padding: 10px 14px;
+      border: 1px solid #b3e5fc;
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #37474f;
+    }
+    .slider-label { width: 130px; }
+    .slider-track {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+    }
+    .slider-track span { width: 55px; text-align: center; color: #546e7a; }
+    input[type=range] {
+      flex: 1;
+      accent-color: #1976d2;
+      cursor: pointer;
+    }
+
+    /* ===== TOAST / MESSAGE ===== */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #d32f2f;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 13px;
+      z-index: 9999;
+      pointer-events: none;
+      display: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(-50%); }
+      20% { transform: translateX(calc(-50% - 8px)); }
+      40% { transform: translateX(calc(-50% + 8px)); }
+      60% { transform: translateX(calc(-50% - 6px)); }
+      80% { transform: translateX(calc(-50% + 6px)); }
+    }
+    .shake { animation: shake 0.5s ease; display: flex !important; }
+
+    /* Step indicator */
+    .step-indicator {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1565c0;
+      background: linear-gradient(90deg, #e3f2fd, #bbdefb);
+      border-radius: 10px;
+      padding: 6px 12px;
+      margin-bottom: 8px;
+      border: 1px solid #90caf9;
+    }
+
+    /* Air arrow */
+    @keyframes arrow-pulse {
+      0%,100% { opacity: 0.4; transform: translateX(0); }
+      50% { opacity: 1; transform: translateX(4px); }
+    }
+
+    /* Label */
+    .svg-label {
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 11px;
+      fill: #37474f;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="title-bar">
+    🔬 THÍ NGHIỆM LỌC NƯỚC ĐỤC 💧
+    <div class="subtitle">Lớp 4 · Khoa học tự nhiên · Minh họa tương tác</div>
+  </div>
+
+  <div class="toast" id="toast">⚠️ Vui lòng thực hiện đúng thứ tự!</div>
+
+  <div class="main-layout">
+    <!-- COLUMN A -->
+    <div class="col-a">
+      <div class="col-header">🧪 Cột A – Nguyên liệu</div>
+      <div id="mat-bottle" class="material-item" onclick="selectMaterial('bottle')">
+        <span class="mat-icon">🍶</span> Chai nhựa
+      </div>
+      <div id="mat-cutter" class="material-item" onclick="selectMaterial('cutter')">
+        <span class="mat-icon">✂️</span> Dụng cụ cắt
+      </div>
+      <div id="mat-drill" class="material-item" onclick="selectMaterial('drill')">
+        <span class="mat-icon">🔩</span> Dụng cụ đục lỗ
+      </div>
+      <div id="mat-cotton" class="material-item disabled" onclick="selectMaterial('cotton')">
+        <span class="mat-icon">🌨️</span> Bông
+      </div>
+      <div id="mat-sand" class="material-item disabled" onclick="selectMaterial('sand')">
+        <span class="mat-icon">🏖️</span> Cát
+      </div>
+      <div id="mat-gravel" class="material-item disabled" onclick="selectMaterial('gravel')">
+        <span class="mat-icon">🪨</span> Sỏi
+      </div>
+      <div id="mat-water" class="material-item disabled" onclick="selectMaterial('water')">
+        <span class="mat-icon">🪣</span> Nước đục
+      </div>
+
+      <hr style="margin: 10px 0; border-color: #b3e5fc;">
+      <div style="font-size: 11px; color: #546e7a; font-weight: 600; margin-bottom: 6px;">⚙️ Thông số thí nghiệm</div>
+      <div class="sliders-panel">
+        <div class="slider-row">
+          <div class="slider-label">🪨 Lớp Sỏi</div>
+          <div class="slider-track">
+            <input type="range" id="sl-gravel" min="1" max="3" value="2" oninput="updateSlider()">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#90a4ae;margin:-5px 0 6px 0;padding:0 2px">
+          <span>Thấp</span><span>TB</span><span>Cao</span>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label">🏖️ Lớp Cát</div>
+          <div class="slider-track">
+            <input type="range" id="sl-sand" min="1" max="3" value="2" oninput="updateSlider()">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#90a4ae;margin:-5px 0 6px 0;padding:0 2px">
+          <span>Thấp</span><span>TB</span><span>Cao</span>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label">🌊 Độ đục</div>
+          <div class="slider-track">
+            <input type="range" id="sl-turbid" min="1" max="3" value="2" oninput="updateSlider()">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#90a4ae;margin:-5px 0 2px 0;padding:0 2px">
+          <span>Ít</span><span>Vừa</span><span>Nhiều</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMN B -->
+    <div class="col-b">
+      <div class="col-b-header">🧫 Cột B – Thực hành</div>
+      <div class="step-indicator" id="step-text">👆 Bấm vào "Chai nhựa" và "Dụng cụ cắt" ở Cột A để bắt đầu!</div>
+
+      <!-- Inventory (draggable items) -->
+      <div class="inventory-row" id="inventory"></div>
+
+      <!-- Workspace (canvas) -->
+      <div class="workspace" id="workspace">
+        <canvas id="filter-canvas"></canvas>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls-bar">
+        <button class="btn btn-auto" onclick="autoRun()">▶️ Chạy tự động</button>
+        <button class="btn btn-pause" onclick="togglePause()">⏸ Tạm dừng</button>
+        <button class="btn btn-reset" onclick="resetAll()">🔄 Làm lại từ đầu</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ===== STATE =====
+  const state = {
+    step: 0,
+    // steps: 0=init, 1=bottle+cutter added, 2=cut, 3=drill A, 4=drill B, 5=assembled, 6=cotton, 7=sand, 8=gravel, 9=water, 10=done
+    inventory: [],
+    bottleInB: false,
+    cutterInB: false,
+    drillInB: false,
+    cottonInB: false,
+    sandInB: false,
+    gravelInB: false,
+    waterInB: false,
+    cut: false,
+    drillA: false,
+    drillB: false,
+    assembled: false,
+    hasCotton: false,
+    hasSand: false,
+    hasGravel: false,
+    waterPoured: false,
+    filterProgress: 0, // 0..1
+    filteredLevel: 0,  // 0..1
+    paused: false,
+    animating: false,
+    autoRunActive: false,
+    autoStep: 0,
+    gravelThickness: 2,
+    sandThickness: 2,
+    turbidity: 2,
+    particles: [],
+    drops: [],
+    airAnimFrame: 0,
+  };
+
+  // ===== CANVAS =====
+  const canvas = document.getElementById('filter-canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resizeCanvas() {
+    const ws = document.getElementById('workspace');
+    canvas.width = ws.clientWidth;
+    canvas.height = 450;
+  }
+  window.addEventListener('resize', () => { resizeCanvas(); drawAll(); });
+  resizeCanvas();
+
+  // ===== GEOMETRY =====
+  function geom() {
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2;
+    // Bottle A (top part, inverted) — displayed as funnel
+    const aLeft = cx - 60, aRight = cx + 60;
+    const aTop = 60, aBottom = 260; // body region
+    const neckTop = aBottom, neckBot = aBottom + 40; // neck (pointing down)
+    // Bottle B (bottom part)
+    const bLeft = cx - 70, bRight = cx + 70;
+    const bTop = 290, bBottom = 440;
+    // Layers inside A (from bottom = neck side, up)
+    const gravelV = state.gravelThickness; // 1,2,3
+    const sandV = state.sandThickness;
+    const cottonH = 24;
+    const sandH = 22 + sandV * 10;
+    const gravelH = 22 + gravelV * 10;
+    const layerBase = aBottom - 10; // bottom of content area in A
+    const cottonTop = layerBase - cottonH;
+    const sandTop = cottonTop - sandH;
+    const gravelTop = sandTop - gravelH;
+    return { W, H, cx, aLeft, aRight, aTop, aBottom, neckTop, neckBot,
+             bLeft, bRight, bTop, bBottom,
+             cottonTop, cottonH, sandTop, sandH, gravelTop, gravelH, layerBase };
+  }
+
+  // ===== DRAW =====
+  function drawAll() {
+    const g = geom();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!state.bottleInB) {
+      // Draw placeholder hint
+      ctx.fillStyle = 'rgba(144,202,249,0.2)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#90a4ae';
+      ctx.font = 'bold 14px Segoe UI';
+      ctx.textAlign = 'center';
+      ctx.fillText('Kéo thả nguyên liệu từ kho đồ vào đây...', canvas.width/2, canvas.height/2);
+      return;
+    }
+
+    if (!state.cut) {
+      drawFullBottle(g);
+    } else if (!state.assembled) {
+      drawCutParts(g);
+    } else {
+      drawAssembled(g);
+    }
+    drawLabels(g);
+    drawParticles(g);
+    drawDrops(g);
+  }
+
+  function drawFullBottle(g) {
+    const { cx, aLeft, aRight, aTop, neckBot } = g;
+    // Bottle body
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(aLeft, aTop);
+    ctx.lineTo(aRight, aTop);
+    ctx.lineTo(aRight, neckBot - 20);
+    ctx.bezierCurveTo(aRight, neckBot, cx+12, neckBot, cx+12, neckBot);
+    ctx.lineTo(cx-12, neckBot);
+    ctx.bezierCurveTo(aLeft, neckBot, aLeft, neckBot - 20, aLeft, neckBot - 20);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(144,202,249,0.4)';
+    ctx.fill();
+    ctx.strokeStyle = '#1976d2';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    // Cap
+    ctx.beginPath();
+    ctx.rect(cx-12, neckBot, 24, 14);
+    ctx.fillStyle = '#ff7043';
+    ctx.fill();
+    ctx.strokeStyle = '#bf360c';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+    // Label
+    ctx.fillStyle = '#1565c0';
+    ctx.font = 'bold 12px Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.fillText('Chai nhựa', cx, aTop + 20);
+    if (state.cutterInB) {
+      ctx.fillStyle = 'rgba(255,152,0,0.3)';
+      ctx.fillRect(aLeft - 5, (aTop + neckBot)/2 - 3, aRight - aLeft + 10, 6);
+      ctx.setLineDash([5,3]);
+      ctx.strokeStyle = '#ff6f00';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(aLeft - 10, (aTop + neckBot)/2);
+      ctx.lineTo(aRight + 10, (aTop + neckBot)/2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  function drawCutParts(g) {
+    const { cx, aLeft, aRight, aTop, aBottom, neckTop, neckBot, bLeft, bRight, bTop, bBottom } = g;
+    // Part A - top half of bottle (upright, before assembly)
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(aLeft, aTop + 30);
+    ctx.lineTo(aRight, aTop + 30);
+    ctx.lineTo(aRight, aTop + 100);
+    ctx.lineTo(cx+12, aTop + 130);
+    ctx.lineTo(cx-12, aTop + 130);
+    ctx.lineTo(aLeft, aTop + 100);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(144,202,249,0.4)';
+    ctx.fill();
+    ctx.strokeStyle = '#1976d2';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    // Cap of part A
+    ctx.beginPath();
+    ctx.rect(cx-12, aTop + 130, 24, 14);
+    ctx.fillStyle = '#ff7043';
+    ctx.fill();
+    ctx.strokeStyle = '#bf360c';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Holes in cap (if drilled)
+    if (state.drillA) {
+      ctx.fillStyle = '#bf360c';
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.arc(cx + i*4.5, aTop + 136, 2, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = '#0d47a1';
+    ctx.font = 'bold 11px Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.fillText('Phần A', cx, aTop + 20);
+    ctx.restore();
+
+    // Part B - bottom of bottle
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(bLeft, bTop);
+    ctx.lineTo(bRight, bTop);
+    ctx.lineTo(bRight, bBottom);
+    ctx.lineTo(bLeft, bBottom);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(144,202,249,0.25)';
+    ctx.fill();
+    ctx.strokeStyle = '#1976d2';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    // Side hole in B
+    if (state.drillB) {
+      ctx.fillStyle = '#1976d2';
+      ctx.beginPath();
+      ctx.arc(bRight - 2, bTop + 25, 5, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#e3f2fd';
+      ctx.beginPath();
+      ctx.arc(bRight - 2, bTop + 25, 3, 0, Math.PI*2);
+      ctx.fill();
+      // Air arrows
+      state.airAnimFrame = (state.airAnimFrame + 1) % 30;
+      const offset = (state.airAnimFrame / 30) * 12;
+      ctx.strokeStyle = '#42a5f5';
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 3; i++) {
+        const ax = bRight + 8 + offset + i*10;
+        const ay = bTop + 25;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(ax + 7, ay);
+        ctx.moveTo(ax + 7, ay - 4);
+        ctx.lineTo(ax + 7, ay + 4);
+        ctx.lineTo(ax + 7 + 5, ay);
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = '#0d47a1';
+    ctx.font = 'bold 11px Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.fillText('Phần B', cx, bBottom - 8);
+    ctx.restore();
+  }
+
+  function drawAssembled(g) {
+    const { cx, aLeft, aRight, aTop, aBottom, neckBot, bLeft, bRight, bTop, bBottom,
+            cottonTop, cottonH, sandTop, sandH, gravelTop, gravelH, layerBase } = g;
+
+    // === Part B (bottom container) ===
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(bLeft, bTop + 5);
+    ctx.lineTo(bRight, bTop + 5);
+    ctx.lineTo(bRight, bBottom);
+    ctx.lineTo(bLeft, bBottom);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fill();
+    ctx.strokeStyle = '#1976d2';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Filtered water in Part B
+    if (state.filteredLevel > 0) {
+      const waterH = (bBottom - bTop - 10) * state.filteredLevel;
+      const wy = bBottom - waterH;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(bLeft+2, wy, bRight-bLeft-4, waterH);
+      ctx.clip();
+      const alpha = 0.15 + state.filteredLevel * 0.4;
+      ctx.fillStyle = `rgba(100,181,246,${alpha})`;
+      ctx.fillRect(bLeft+2, wy, bRight-bLeft-4, waterH);
+      // Waves
+      ctx.beginPath();
+      const waveY = wy + 3;
+      for (let x = bLeft+2; x < bRight-2; x += 15) {
+        ctx.arc(x+7.5, waveY, 7.5, Math.PI, 0);
+      }
+      ctx.fillStyle = `rgba(135,206,250,${alpha + 0.2})`;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Side hole in B
+    ctx.fillStyle = '#1976d2';
+    ctx.beginPath();
+    ctx.arc(bRight - 2, bTop + 30, 5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#e3f2fd';
+    ctx.beginPath();
+    ctx.arc(bRight - 2, bTop + 30, 3, 0, Math.PI*2);
+    ctx.fill();
+
+    // Air arrows animation
+    state.airAnimFrame = (state.airAnimFrame + 1) % 40;
+    const offset = (state.airAnimFrame / 40) * 15;
+    ctx.strokeStyle = '#1976d2';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([2,2]);
+    for (let i = 0; i < 3; i++) {
+      const ax = bRight + 6 + offset + i*12;
+      const ay = bTop + 30;
+      if (ax < bRight + 55) {
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(ax + 8, ay);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(ax + 8, ay-4);
+        ctx.lineTo(ax + 8, ay+4);
+        ctx.lineTo(ax + 14, ay);
+        ctx.closePath();
+        ctx.fillStyle = '#1976d2';
+        ctx.fill();
+      }
+    }
+    ctx.setLineDash([]);
+
+    // === Part A (inverted, sitting on top of B) ===
+    // Inverted bottle body — wide at top, narrows to neck at bottom
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(aLeft, aTop);
+    ctx.lineTo(aRight, aTop);
+    ctx.lineTo(aRight, aTop + 110);
+    ctx.lineTo(cx + 20, aTop + 155);
+    ctx.lineTo(cx + 12, bTop + 5);
+    ctx.lineTo(cx - 12, bTop + 5);
+    ctx.lineTo(cx - 20, aTop + 155);
+    ctx.lineTo(aLeft, aTop + 110);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fill();
+    ctx.strokeStyle = '#1976d2';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // ---- Dirty water fill in A ----
+    if (state.filterProgress > 0 && state.filterProgress < 1) {
+      const fillTop = aTop + (gravelTop - aTop) * (1 - state.filterProgress*0.6);
+      const fillBot = aTop + 115;
+      const turbidy = state.turbidity;
+      const alpha = 0.3 + turbidy * 0.1 - state.filterProgress * 0.15;
+      ctx.save();
+      // Clip to bottle A shape
+      ctx.beginPath();
+      ctx.moveTo(aLeft, aTop);
+      ctx.lineTo(aRight, aTop);
+      ctx.lineTo(aRight, aTop + 110);
+      ctx.lineTo(cx+20, aTop+155);
+      ctx.lineTo(cx+12, bTop+5);
+      ctx.lineTo(cx-12, bTop+5);
+      ctx.lineTo(cx-20, aTop+155);
+      ctx.lineTo(aLeft, aTop+110);
+      ctx.closePath();
+      ctx.clip();
+      ctx.fillStyle = `rgba(139,90,43,${alpha})`;
+      ctx.fillRect(aLeft, fillTop, aRight - aLeft, fillBot - fillTop);
+      ctx.restore();
+    }
+
+    // ---- Layers ----
+    // Gravel layer
+    if (state.hasGravel) {
+      ctx.save();
+      ctx.beginPath();
+      clipToBottleA(ctx, g);
+      ctx.clip();
+      const gr = ctx.createLinearGradient(aLeft, gravelTop, aLeft, gravelTop + gravelH);
+      gr.addColorStop(0, 'rgba(158,158,158,0.9)');
+      gr.addColorStop(1, 'rgba(117,117,117,0.9)');
+      ctx.fillStyle = gr;
+      ctx.fillRect(aLeft, gravelTop, aRight-aLeft, gravelH);
+      // Pebble texture
+      ctx.fillStyle = 'rgba(66,66,66,0.3)';
+      for (let px = aLeft+8; px < aRight-8; px += 16) {
+        for (let py = gravelTop+4; py < gravelTop + gravelH - 4; py += 11) {
+          ctx.beginPath();
+          ctx.ellipse(px + (py%7)-3, py, 6, 4, 0.3, 0, Math.PI*2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+    // Sand layer
+    if (state.hasSand) {
+      ctx.save();
+      ctx.beginPath();
+      clipToBottleA(ctx, g);
+      ctx.clip();
+      const sg = ctx.createLinearGradient(aLeft, sandTop, aLeft, sandTop + sandH);
+      sg.addColorStop(0, 'rgba(255,213,79,0.9)');
+      sg.addColorStop(1, 'rgba(255,179,0,0.9)');
+      ctx.fillStyle = sg;
+      ctx.fillRect(aLeft, sandTop, aRight-aLeft, sandH);
+      // Sand texture
+      ctx.fillStyle = 'rgba(230,160,0,0.4)';
+      for (let px = aLeft+5; px < aRight-5; px += 8) {
+        for (let py = sandTop+3; py < sandTop+sandH-3; py+=7) {
+          ctx.beginPath();
+          ctx.arc(px + (py%5)-2, py, 2, 0, Math.PI*2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+    // Cotton layer
+    if (state.hasCotton) {
+      ctx.save();
+      ctx.beginPath();
+      clipToBottleA(ctx, g);
+      ctx.clip();
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.fillRect(aLeft, cottonTop, aRight-aLeft, cottonH);
+      // Cotton puff texture
+      ctx.fillStyle = 'rgba(220,220,235,0.7)';
+      for (let px = aLeft+6; px < aRight-6; px += 14) {
+        ctx.beginPath();
+        ctx.arc(px, cottonTop + cottonH/2, 7, 0, Math.PI*2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(px+7, cottonTop + cottonH/2 - 3, 5, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Cap (at bottom since inverted) with holes
+    ctx.beginPath();
+    ctx.rect(cx-15, bTop - 12, 30, 12);
+    ctx.fillStyle = '#ef5350';
+    ctx.fill();
+    ctx.strokeStyle = '#b71c1c';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Holes
+    ctx.fillStyle = '#b71c1c';
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.arc(cx + i*5, bTop - 6, 2, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function clipToBottleA(ctx2, g) {
+    const { cx, aLeft, aRight, aTop, bTop } = g;
+    ctx2.moveTo(aLeft, aTop);
+    ctx2.lineTo(aRight, aTop);
+    ctx2.lineTo(aRight, aTop + 110);
+    ctx2.lineTo(cx + 20, aTop + 155);
+    ctx2.lineTo(cx + 12, bTop + 5);
+    ctx2.lineTo(cx - 12, bTop + 5);
+    ctx2.lineTo(cx - 20, aTop + 155);
+    ctx2.lineTo(aLeft, aTop + 110);
+    ctx2.closePath();
+  }
+
+  function drawLabels(g) {
+    if (!state.assembled) return;
+    const { cx, aLeft, aRight, aTop, bLeft, bRight, bTop, bBottom,
+            cottonTop, cottonH, sandTop, sandH, gravelTop, gravelH } = g;
+
+    ctx.font = 'bold 11px Segoe UI';
+    ctx.textAlign = 'left';
+
+    const labelX = aRight + 12;
+
+    // Helper: draw label with line
+    function lbl(text, lx, ly, tx, ty, color) {
+      ctx.strokeStyle = color || '#546e7a';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3,3]);
+      ctx.beginPath();
+      ctx.moveTo(lx, ly);
+      ctx.lineTo(tx - 4, ty);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color || '#37474f';
+      ctx.textAlign = 'left';
+      ctx.fillText(text, tx, ty + 4);
+    }
+
+    // Part A label
+    ctx.fillStyle = '#0d47a1';
+    ctx.font = 'bold 12px Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.fillText('Phần A', aLeft - 35, aTop + 50);
+
+    // Part B label
+    ctx.fillStyle = '#0d47a1';
+    ctx.fillText('Phần B', bLeft - 35, (bTop + bBottom) / 2);
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 11px Segoe UI';
+
+    // Gravel
+    if (state.hasGravel) {
+      lbl('🪨 Sỏi', aRight, gravelTop + gravelH/2, labelX, gravelTop + gravelH/2, '#616161');
+    }
+    // Sand
+    if (state.hasSand) {
+      lbl('🏖️ Cát', aRight, sandTop + sandH/2, labelX, sandTop + sandH/2, '#f9a825');
+    }
+    // Cotton
+    if (state.hasCotton) {
+      lbl('🌨️ Bông', aRight, cottonTop + cottonH/2, labelX, cottonTop + cottonH/2, '#90a4ae');
+    }
+
+    // Water labels
+    if (state.filterProgress > 0) {
+      lbl('💧 Nước đục', aLeft, aTop + 60, aLeft - 90, aTop + 55, '#8d5524');
+    }
+    if (state.filteredLevel > 0) {
+      const wy = bBottom - (bBottom - bTop - 10) * state.filteredLevel;
+      lbl('✨ Nước sau lọc', bRight - 2, wy + 10, bRight + 10, wy + 10, '#0288d1');
+    }
+
+    // Side hole label
+    lbl('🔵 Lỗ', bRight - 2, bTop + 30, bRight + 55, bTop + 55, '#1976d2');
+    // Air arrow label
+    ctx.fillStyle = '#1976d2';
+    ctx.font = '10px Segoe UI';
+    ctx.fillText('không khí thoát ra', bRight + 20, bTop + 20);
+  }
+
+  // ===== PARTICLES =====
+  function spawnParticles(g) {
+    if (!state.waterPoured || state.paused) return;
+    if (state.filterProgress >= 1) return;
+    const { cx, aTop } = g;
+    const turbidy = state.turbidity;
+    const count = turbidy * 2;
+    for (let i = 0; i < count; i++) {
+      const size = 3 + Math.random() * (turbidy * 3);
+      const colors = ['#8d5524','#6d4c41','#795548','#a1887f','#5d4037'];
+      state.particles.push({
+        x: cx + (Math.random()-0.5)*40,
+        y: aTop + 10 + Math.random()*20,
+        vx: (Math.random()-0.5)*0.3,
+        vy: 0.8 + Math.random()*0.6,
+        size: size,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        life: 1,
+        maxY: null, // will be set when hitting a layer
+      });
+    }
+  }
+
+  function updateParticles(g) {
+    const { gravelTop, gravelH, sandTop, sandH, cottonTop, cottonH, bTop } = g;
+    state.particles = state.particles.filter(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= 0.008;
+      // Stop at gravel
+      if (state.hasGravel && p.y >= gravelTop && p.size > 5) {
+        p.vy *= 0.1;
+        p.life -= 0.03;
+      }
+      // Stop at sand
+      else if (state.hasSand && p.y >= sandTop && p.size > 3) {
+        p.vy *= 0.1;
+        p.life -= 0.04;
+      }
+      // All caught by cotton
+      else if (state.hasCotton && p.y >= cottonTop) {
+        p.vy = 0;
+        p.life -= 0.05;
+      }
+      return p.life > 0 && p.y < bTop;
+    });
+  }
+
+  function drawParticles(g) {
+    for (const p of state.particles) {
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size/2, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ===== DROPS =====
+  function spawnDrop(g) {
+    if (!state.waterPoured || state.paused) return;
+    const { cx, bTop, bBottom } = g;
+    // Clear drop from cap holes
+    state.drops.push({
+      x: cx + (Math.random()-0.5)*10,
+      y: bTop - 12,
+      vy: 0.5,
+      size: 3 + Math.random()*3,
+      life: 1,
+    });
+  }
+
+  function updateDrops(g) {
+    const { bBottom } = g;
+    state.drops = state.drops.filter(d => {
+      d.y += d.vy;
+      d.vy += 0.08;
+      d.life -= 0.02;
+      return d.y < bBottom && d.life > 0;
+    });
+  }
+
+  function drawDrops(g) {
+    const { bLeft, bRight } = g;
+    for (const d of state.drops) {
+      ctx.globalAlpha = d.life * 0.9;
+      ctx.fillStyle = '#64b5f6';
+      ctx.beginPath();
+      ctx.ellipse(d.x, d.y, d.size/2, d.size, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ===== ANIMATION LOOP =====
+  let lastTime = 0;
+  let dropTimer = 0;
+  let particleTimer = 0;
+
+  function animLoop(ts) {
+    if (!state.paused) {
+      const dt = ts - lastTime;
+      lastTime = ts;
+
+      if (state.waterPoured && state.filterProgress < 1) {
+        const speed = 0.00015;
+        state.filterProgress = Math.min(1, state.filterProgress + speed * dt);
+        state.filteredLevel = Math.min(0.7, state.filteredLevel + speed * 0.6 * dt);
+
+        particleTimer += dt;
+        if (particleTimer > 150) {
+          spawnParticles(geom());
+          particleTimer = 0;
+        }
+        dropTimer += dt;
+        if (dropTimer > 300) {
+          spawnDrop(geom());
+          dropTimer = 0;
+        }
+        updateParticles(geom());
+        updateDrops(geom());
+      }
+
+      if (state.filterProgress >= 1 && !state.done) {
+        state.done = true;
+        setStep(10);
+      }
+    }
+    drawAll();
+    requestAnimationFrame(animLoop);
+  }
+  requestAnimationFrame(animLoop);
+
+  // ===== INVENTORY =====
+  const materialDefs = {
+    bottle: { icon: '🍶', label: 'Chai nhựa', w: 60, h: 80 },
+    cutter: { icon: '✂️', label: 'D.cụ cắt', w: 60, h: 50 },
+    drill:  { icon: '🔩', label: 'D.cụ đục', w: 55, h: 50 },
+    cotton: { icon: '🌨️', label: 'Bông', w: 55, h: 45 },
+    sand:   { icon: '🏖️', label: 'Cát', w: 55, h: 45 },
+    gravel: { icon: '🪨', label: 'Sỏi', w: 55, h: 45 },
+    water:  { icon: '🪣', label: 'Nước đục', w: 65, h: 50 },
+  };
+
+  function addToInventory(type) {
+    if (state.inventory.includes(type)) return;
+    state.inventory.push(type);
+    renderInventory();
+  }
+
+  function removeFromInventory(type) {
+    state.inventory = state.inventory.filter(t => t !== type);
+    renderInventory();
+  }
+
+  function renderInventory() {
+    const inv = document.getElementById('inventory');
+    inv.innerHTML = '';
+    for (const type of state.inventory) {
+      const d = materialDefs[type];
+      const el = document.createElement('div');
+      el.className = 'inv-item';
+      el.id = 'inv-' + type;
+      el.draggable = true;
+      el.innerHTML = `<span class="item-icon">${d.icon}</span><span>${d.label}</span>`;
+      el.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('type', type);
+        el.classList.add('dragging');
+      });
+      el.addEventListener('dragend', () => el.classList.remove('dragging'));
+      inv.appendChild(el);
+    }
+  }
+
+  // Drop onto workspace
+  const workspace = document.getElementById('workspace');
+  workspace.addEventListener('dragover', e => { e.preventDefault(); });
+  workspace.addEventListener('drop', e => {
+    e.preventDefault();
+    const type = e.dataTransfer.getData('type');
+    if (type) handleDrop(type);
+  });
+
+  // ===== MATERIAL SELECTION =====
+  function selectMaterial(type) {
+    const matMap = {
+      bottle: 'bottleInB', cutter: 'cutterInB', drill: 'drillInB',
+      cotton: 'cottonInB', sand: 'sandInB', gravel: 'gravelInB', water: 'waterInB'
+    };
+    if (!state[matMap[type]]) {
+      state[matMap[type]] = true;
+      addToInventory(type);
+      markUsed(type);
+    }
+  }
+
+  function markUsed(type) {
+    const el = document.getElementById('mat-' + type);
+    if (el) el.classList.add('used');
+  }
+
+  // ===== DROP HANDLER =====
+  function handleDrop(type) {
+    // Determine what action to take based on type and current state
+    if (type === 'cutter' && state.bottleInB && !state.cut) {
+      performCut();
+    } else if (type === 'drill' && state.cut && !state.drillA) {
+      performDrillA();
+    } else if (type === 'drill' && state.drillA && !state.drillB) {
+      performDrillB();
+    } else if ((type === 'bottle' || type === 'cutter') && state.cut && state.drillA && state.drillB && !state.assembled) {
+      performAssemble();
+    } else if (type === 'cotton' && state.assembled && !state.hasCotton) {
+      addLayer('cotton');
+    } else if (type === 'sand' && state.assembled && state.hasCotton && !state.hasSand) {
+      addLayer('sand');
+    } else if (type === 'gravel' && state.assembled && state.hasSand && !state.hasGravel) {
+      addLayer('gravel');
+    } else if (type === 'water' && state.assembled && state.hasGravel && !state.waterPoured) {
+      pourWater();
+    } else {
+      // Wrong order
+      showToast('⚠️ Vui lòng thực hiện đúng thứ tự thí nghiệm!');
+    }
+  }
+
+  // ===== ACTIONS =====
+  function performCut() {
+    if (state.animating) return;
+    state.animating = true;
+    setStep(2, '✂️ Đang cắt chai nhựa thành hai phần...');
+    setTimeout(() => {
+      state.cut = true;
+      removeFromInventory('cutter');
+      state.animating = false;
+      enableMaterials(['drill']);
+      setStep(3, '🔩 Kéo "Dụng cụ đục lỗ" vào Phần A để đục lỗ nắp chai!');
+    }, 1200);
+  }
+
+  function performDrillA() {
+    if (state.animating) return;
+    state.animating = true;
+    setStep(3, '🔩 Đang đục lỗ nắp chai (Phần A)...');
+    setTimeout(() => {
+      state.drillA = true;
+      state.animating = false;
+      setStep(4, '🔩 Kéo "Dụng cụ đục lỗ" vào Phần B để đục lỗ bên hông!');
+    }, 1000);
+  }
+
+  function performDrillB() {
+    if (state.animating) return;
+    state.animating = true;
+    setStep(4, '🔩 Đang đục lỗ bên hông (Phần B)...');
+    setTimeout(() => {
+      state.drillB = true;
+      removeFromInventory('drill');
+      state.animating = false;
+      setStep(5, '🔗 Kéo Phần A hoặc Phần B để lắp ghép lại thành hệ lọc!');
+    }, 1000);
+  }
+
+  function performAssemble() {
+    if (state.animating) return;
+    state.animating = true;
+    setStep(5, '🔄 Đang lật ngược Phần A và lắp vào Phần B...');
+    setTimeout(() => {
+      state.assembled = true;
+      removeFromInventory('bottle');
+      state.animating = false;
+      enableMaterials(['cotton','sand','gravel']);
+      setStep(6, '🌨️ Kéo "Bông" vào hệ lọc (đặt vào đáy Phần A)!');
+    }, 1500);
+  }
+
+  function addLayer(layer) {
+    if (state.animating) return;
+    state.animating = true;
+    const labels = { cotton: 'bông', sand: 'cát', gravel: 'sỏi' };
+    setStep({ cotton:6, sand:7, gravel:8 }[layer], `🌊 Đang thêm lớp ${labels[layer]}...`);
+    setTimeout(() => {
+      if (layer === 'cotton') state.hasCotton = true;
+      if (layer === 'sand') state.hasSand = true;
+      if (layer === 'gravel') { state.hasGravel = true; enableMaterials(['water']); }
+      removeFromInventory(layer);
+      state.animating = false;
+      if (layer === 'gravel') {
+        setStep(9, '🪣 Kéo "Nước đục" vào hệ lọc để bắt đầu lọc nước!');
+      } else {
+        const next = { cotton: '🏖️ Kéo "Cát" vào hệ lọc (đặt lên trên bông)!', sand: '🪨 Kéo "Sỏi" vào hệ lọc (đặt lên trên cát)!' };
+        setStep({ cotton:7, sand:8 }[layer], next[layer]);
+      }
+    }, 800);
+  }
+
+  function pourWater() {
+    if (state.animating) return;
+    state.animating = true;
+    state.waterPoured = true;
+    removeFromInventory('water');
+    state.animating = false;
+    state.filterProgress = 0.001;
+    setStep(9, '💧 Nước đang thấm qua các lớp lọc... hãy quan sát!');
+  }
+
+  // ===== ENABLE MATERIALS =====
+  function enableMaterials(types) {
+    for (const t of types) {
+      const el = document.getElementById('mat-' + t);
+      if (el) el.classList.remove('disabled');
+    }
+  }
+
+  // ===== STEP TEXT =====
+  const stepMessages = [
+    '👆 Bấm vào "Chai nhựa" và "Dụng cụ cắt" ở Cột A để bắt đầu!',
+    '✂️ Kéo "Dụng cụ cắt" vào chai để cắt đôi!',
+    '✂️ Đang cắt chai nhựa thành hai phần...',
+    '🔩 Kéo "Dụng cụ đục lỗ" vào Phần A để đục lỗ nắp chai!',
+    '🔩 Kéo "Dụng cụ đục lỗ" vào Phần B để đục lỗ bên hông!',
+    '🔗 Kéo Phần A vào khu vực để lắp ghép thành hệ lọc!',
+    '🌨️ Kéo "Bông" vào hệ lọc!',
+    '🏖️ Kéo "Cát" vào hệ lọc (đặt lên trên bông)!',
+    '🪨 Kéo "Sỏi" vào hệ lọc (đặt lên trên cát)!',
+    '🪣 Kéo "Nước đục" vào hệ lọc để bắt đầu lọc!',
+    '🎉 Thí nghiệm hoàn thành! Nước đã được lọc sạch hơn nhiều! 🌟',
+  ];
+
+  function setStep(n, msg) {
+    if (typeof n === 'number') state.step = n;
+    const txt = msg || stepMessages[state.step] || '';
+    document.getElementById('step-text').textContent = txt;
+  }
+
+  // ===== TOAST =====
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('shake');
+    setTimeout(() => t.classList.remove('shake'), 600);
+    setTimeout(() => { t.style.display = 'none'; }, 2500);
+  }
+
+  // ===== AUTO RUN =====
+  const autoSteps = [
+    () => { selectMaterial('bottle'); selectMaterial('cutter'); setStep(1, '✂️ Kéo "Dụng cụ cắt" vào chai để cắt đôi!'); },
+    () => performCut(),
+    () => { selectMaterial('drill'); },
+    () => performDrillA(),
+    () => performDrillB(),
+    () => performAssemble(),
+    () => { selectMaterial('cotton'); setTimeout(() => addLayer('cotton'), 300); },
+    () => { selectMaterial('sand'); setTimeout(() => addLayer('sand'), 300); },
+    () => { selectMaterial('gravel'); setTimeout(() => addLayer('gravel'), 300); },
+    () => { selectMaterial('water'); setTimeout(() => pourWater(), 300); },
+  ];
+
+  let autoIdx = 0;
+  let autoTimer = null;
+
+  function autoRun() {
+    if (state.autoRunActive) return;
+    state.autoRunActive = true;
+    autoIdx = 0;
+    runNextAutoStep();
+  }
+
+  function runNextAutoStep() {
+    if (autoIdx >= autoSteps.length) {
+      state.autoRunActive = false;
+      return;
+    }
+    autoSteps[autoIdx]();
+    autoIdx++;
+    const delay = autoIdx <= 2 ? 1500 : autoIdx <= 5 ? 2000 : 2500;
+    autoTimer = setTimeout(runNextAutoStep, delay);
+  }
+
+  // ===== PAUSE =====
+  function togglePause() {
+    state.paused = !state.paused;
+    document.querySelector('.btn-pause').textContent = state.paused ? '▶ Tiếp tục' : '⏸ Tạm dừng';
+    if (autoTimer && state.paused) {
+      clearTimeout(autoTimer);
+    } else if (!state.paused && state.autoRunActive) {
+      runNextAutoStep();
+    }
+  }
+
+  // ===== RESET =====
+  function resetAll() {
+    if (autoTimer) clearTimeout(autoTimer);
+    Object.assign(state, {
+      step: 0, inventory: [],
+      bottleInB: false, cutterInB: false, drillInB: false,
+      cottonInB: false, sandInB: false, gravelInB: false, waterInB: false,
+      cut: false, drillA: false, drillB: false, assembled: false,
+      hasCotton: false, hasSand: false, hasGravel: false,
+      waterPoured: false, filterProgress: 0, filteredLevel: 0,
+      paused: false, animating: false, autoRunActive: false,
+      particles: [], drops: [], done: false,
+    });
+    document.querySelector('.btn-pause').textContent = '⏸ Tạm dừng';
+    // Reset material buttons
+    ['bottle','cutter','drill','cotton','sand','gravel','water'].forEach(t => {
+      const el = document.getElementById('mat-' + t);
+      if (el) {
+        el.classList.remove('used', 'disabled');
+        if (['cotton','sand','gravel','water'].includes(t)) el.classList.add('disabled');
+      }
+    });
+    renderInventory();
+    setStep(0);
+    updateSlider();
+  }
+
+  // ===== SLIDERS =====
+  function updateSlider() {
+    state.gravelThickness = parseInt(document.getElementById('sl-gravel').value);
+    state.sandThickness = parseInt(document.getElementById('sl-sand').value);
+    state.turbidity = parseInt(document.getElementById('sl-turbid').value);
+  }
+
+  // Initial state
+  setStep(0);
+  updateSlider();
+  </script>
+</body>
+</html>
